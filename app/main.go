@@ -22,8 +22,9 @@ func idHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":  id,
-		"pod": podName,
+		"id":     id,
+		"pod":    podName,
+		"source": "ci-argocd-e2e-test",
 	})
 }
 
