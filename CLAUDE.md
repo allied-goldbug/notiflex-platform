@@ -25,4 +25,4 @@ asia-northeast3-docker.pkg.dev/project-d64f9b5c-20c8-4906-95b/notiflex
 
 - 클러스터/인프라 변경 전 항상 현재 상태를 확인한다.
 - 파괴적이거나 되돌리기 어려운 작업(삭제, force-push 등)은 실행 전 사용자에게 확인받는다.
-- 모든 kubectl 명령에는 `--context gke-sysnet4admin_book_gitaiops`를 명시한다.
+- 모든 kubectl 명령에는 `--context gke_project-d64f9b5c-20c8-4906-95b_asia-northeast3-a_notiflex-cluster`를 명시한다.
