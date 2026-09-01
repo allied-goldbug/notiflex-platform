@@ -15,7 +15,7 @@
 | ch3 | 3.2 GitOps 도구 | ✅ | 2026-08-31 | ArgoCD 설치, notiflex-smb Application Synced/Healthy |
 | ch3 | 3.3 기능 추가 | ✅ | 2026-08-31 | /version 엔드포인트 추가(v0.1.1) 후 문제로 롤백(v0.1.0) |
 | ch3 | 3.4 CI | ✅ | 2026-09-01 | GitHub Actions, Workload Identity Federation 인증 (조직 정책상 SA 키 발급 차단) |
-| ch3 | 3.5 CI-CD 연결 | ⬜ | | |
+| ch3 | 3.5 CI-CD 연결 | ✅ | 2026-09-01 | CI가 매니페스트 이미지 태그 자동 갱신 후 push, ArgoCD 자동 동기화까지 엔드투엔드 검증 완료 |
 | ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
 | ch4 | 4.3 로그 수집 | ⬜ | | |
 | ch4 | 4.4 알림 | ⬜ | | |
@@ -50,7 +50,7 @@
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | 2026-08-30 최초 설정 (ch6 valkey-go, ch8 OTel SDK 요구사항 대비) |
-| Notiflex 이미지 | v0.1.0 | 2026-08-30 최초 빌드/배포. v0.1.1(/version 엔드포인트) 시도 후 문제로 v0.1.0 롤백. CI 검증용 커밋(`sha-5f45044`)은 Artifact Registry에만 푸시, 배포는 미적용 |
+| Notiflex 이미지 | sha-36b94bb | 2026-08-30 v0.1.0 최초 빌드/배포. v0.1.1(/version 엔드포인트) 시도 후 문제로 v0.1.0 롤백. 2026-09-01부터 CI가 git SHA 태그로 자동 관리 (3.5 CI-ArgoCD 연결 이후 시맨틱 버전 태그 대신 SHA 태그 사용) |
 | ArgoCD | v3.5.2 | 2026-08-31 설치, notiflex-smb Application Synced/Healthy |
 | Kafka | | |
 | OTel SDK | | |
@@ -72,3 +72,4 @@
 | 3.4 | 로컬 kubectl 컨텍스트가 `gke-gcloud-auth-plugin` 미설치로 인증 실패, 저장소 CLAUDE.md에 적힌 kubectl 컨텍스트명(`gke-sysnet4admin_book_gitaiops`)도 실제 클러스터 컨텍스트명과 불일치 | `gcloud components install gke-gcloud-auth-plugin` 설치 및 PATH 등록, CLAUDE.md의 컨텍스트명을 실제 값(`gke_project-d64f9b5c-20c8-4906-95b_asia-northeast3-a_notiflex-cluster`)으로 수정 |
 | 3.4 | CI SA의 JSON 키 발급 시도 시 조직 정책(`constraints/iam.disableServiceAccountKeyCreation`)으로 `FAILED_PRECONDITION` 발생 | Service Account 키 대신 Workload Identity Federation으로 인증 방식 전환 (Pool/Provider/IAM 바인딩은 ch2에서 이미 준비되어 있었음) |
 | 3.4 | `gh` 저장소 push 시 `refusing to allow an OAuth App to create or update workflow` — 초기 `gh auth login` 토큰에 `workflow` 스코프가 없어 `.github/workflows/` 변경 push가 거부됨 | `gh auth refresh -h github.com -s workflow`로 스코프 추가 후 재시도 |
+| 3.5 | 저장소 기본 workflow 권한이 `read`라서 CI가 매니페스트 커밋을 push할 수 없었음 (`GITHUB_TOKEN` 권한 부족) | `gh api -X PUT .../actions/permissions/workflow`로 `default_workflow_permissions=write` 설정 (독자 승인 후 진행) |
