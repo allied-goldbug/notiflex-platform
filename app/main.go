@@ -32,6 +32,6 @@ func main() {
 	http.HandleFunc("/id", idHandler)
 
 	port := "8080"
-	fmt.Printf("notiflex-api listening on :%s\n", port)
+	fmt.Printf("notiflex-api listening on port %s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
