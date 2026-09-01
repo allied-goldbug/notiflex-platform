@@ -43,6 +43,7 @@
 | 영역 | 선택 | 검토한 대안 | 선택 이유 |
 |------|------|-----------|----------|
 | GitOps 도구 (3.2) | ArgoCD | (이전 세션 기록 없음, 클러스터 상태로 완료만 확인) | |
+| CI 도구 (3.4) | GitHub Actions | (이전 세션 기록 없음, 워크플로우 존재로 완료만 확인) | |
 | CI GCP 인증 (3.4) | Workload Identity Federation | Service Account JSON 키 | 프로젝트 조직 정책(`constraints/iam.disableServiceAccountKeyCreation`)이 키 발급을 차단, 장기 키 유출 위험도 없는 WIF가 더 안전 |
 
 ## 현재 버전
