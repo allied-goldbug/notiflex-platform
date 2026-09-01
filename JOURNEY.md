@@ -6,15 +6,15 @@
 
 | 챕터 | 서브챕터 | 상태 | 완료일 | 비고 |
 |------|---------|------|--------|------|
-| ch2 | 2.2 설치 확인 | ⬜ | | 이 저장소 세션에서는 미실행 |
+| ch2 | 2.2 설치 확인 | ✅ | 2026-09-01 | statusline 설정 포함 |
 | ch2 | 2.3 gcloud 설정 | ✅ | 2026-08-30 | Artifact Registry Docker 인증(서울 리전) 포함 |
 | ch2 | 2.4 GitHub 저장소 | ✅ | 2026-08-30 | notiflex-platform, public으로 생성 (기본값 private에서 변경) |
 | ch2 | 2.5 GKE 클러스터 | ✅ | 2026-08-30 | notiflex-cluster, Gateway API 활성화 |
 | ch2 | 2.6 빌드/배포 | ✅ | 2026-08-30 | notiflex-api v0.1.0, Pod 2개 Running |
 | ch2 | 2.7 첫 커밋 | ✅ | 2026-08-31 | |
-| ch3 | 3.2 GitOps 도구 | ⬜ | | |
-| ch3 | 3.3 기능 추가 | ⬜ | | |
-| ch3 | 3.4 CI | ⬜ | | |
+| ch3 | 3.2 GitOps 도구 | ✅ | 2026-08-31 | ArgoCD 설치, notiflex-smb Application Synced/Healthy |
+| ch3 | 3.3 기능 추가 | ✅ | 2026-08-31 | /version 엔드포인트 추가(v0.1.1) 후 문제로 롤백(v0.1.0) |
+| ch3 | 3.4 CI | ✅ | 2026-09-01 | GitHub Actions, Workload Identity Federation 인증 (조직 정책상 SA 키 발급 차단) |
 | ch3 | 3.5 CI-CD 연결 | ⬜ | | |
 | ch4 | 4.2 메트릭 모니터링 | ⬜ | | |
 | ch4 | 4.3 로그 수집 | ⬜ | | |
@@ -42,15 +42,16 @@
 
 | 영역 | 선택 | 검토한 대안 | 선택 이유 |
 |------|------|-----------|----------|
-| | | | |
+| GitOps 도구 (3.2) | ArgoCD | (이전 세션 기록 없음, 클러스터 상태로 완료만 확인) | |
+| CI GCP 인증 (3.4) | Workload Identity Federation | Service Account JSON 키 | 프로젝트 조직 정책(`constraints/iam.disableServiceAccountKeyCreation`)이 키 발급을 차단, 장기 키 유출 위험도 없는 WIF가 더 안전 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | 2026-08-30 최초 설정 (ch6 valkey-go, ch8 OTel SDK 요구사항 대비) |
-| Notiflex 이미지 | v0.1.0 | 2026-08-30 최초 빌드/배포 |
-| ArgoCD | | |
+| Notiflex 이미지 | v0.1.0 | 2026-08-30 최초 빌드/배포. v0.1.1(/version 엔드포인트) 시도 후 문제로 v0.1.0 롤백. CI 검증용 커밋(`sha-5f45044`)은 Artifact Registry에만 푸시, 배포는 미적용 |
+| ArgoCD | v3.5.2 | 2026-08-31 설치, notiflex-smb Application Synced/Healthy |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -68,3 +69,6 @@
 |------|------|------|
 | 2.5 | gcloud config의 프로젝트 ID(`minlife1217-gitaiops-project`)가 실제로는 존재하지 않아 클러스터 생성 불가 | 접근 가능한 `project-d64f9b5c-20c8-4906-95b`("My First Project")로 전환, Container API 활성화 후 진행 |
 | 2.6 | `gcloud builds submit` 최초 실행 시 `PERMISSION_DENIED` — Cloud Build API를 막 활성화해 서비스 계정이 아직 없었고, 이 프로젝트는 빌더로 Compute Engine 기본 서비스 계정을 사용하도록 구성되어 있었음 | Compute 기본 서비스 계정에 `roles/storage.objectViewer`, `roles/artifactregistry.writer`, `roles/logging.logWriter` 부여 후 재시도하여 해결 |
+| 3.4 | 로컬 kubectl 컨텍스트가 `gke-gcloud-auth-plugin` 미설치로 인증 실패, 저장소 CLAUDE.md에 적힌 kubectl 컨텍스트명(`gke-sysnet4admin_book_gitaiops`)도 실제 클러스터 컨텍스트명과 불일치 | `gcloud components install gke-gcloud-auth-plugin` 설치 및 PATH 등록, CLAUDE.md의 컨텍스트명을 실제 값(`gke_project-d64f9b5c-20c8-4906-95b_asia-northeast3-a_notiflex-cluster`)으로 수정 |
+| 3.4 | CI SA의 JSON 키 발급 시도 시 조직 정책(`constraints/iam.disableServiceAccountKeyCreation`)으로 `FAILED_PRECONDITION` 발생 | Service Account 키 대신 Workload Identity Federation으로 인증 방식 전환 (Pool/Provider/IAM 바인딩은 ch2에서 이미 준비되어 있었음) |
+| 3.4 | `gh` 저장소 push 시 `refusing to allow an OAuth App to create or update workflow` — 초기 `gh auth login` 토큰에 `workflow` 스코프가 없어 `.github/workflows/` 변경 push가 거부됨 | `gh auth refresh -h github.com -s workflow`로 스코프 추가 후 재시도 |
