@@ -1,0 +1,10 @@
+loki:
+  serviceName: loki.monitoring.svc.cluster.local
+  servicePort: 3100
+
+resources:
+  requests:
+    cpu: 5m
+    memory: 32Mi
+  limits:
+    memory: 100Mi
