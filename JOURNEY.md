@@ -19,7 +19,7 @@
 | ch4 | 4.2 메트릭 모니터링 | ✅ | 2026-09-03 | kube-prometheus-stack 설치, Notiflex 대시보드(Pod CPU/메모리/재시작) 생성. HTTP 요청 수는 앱에 /metrics 미구현으로 보류 |
 | ch4 | 4.3 로그 수집 | ✅ | 2026-09-04 | Loki(SingleBinary) + Fluent Bit(DaemonSet) 설치, Grafana에 Loki 데이터소스 추가. `{namespace="notiflex"}` 쿼리로 notiflex-api 로그 확인 완료 |
 | ch4 | 4.4 알림 | ✅ | 2026-09-05 | PrometheusRule(PodRestartTooMany) + Alertmanager → Slack Webhook 연동. Webhook URL은 Secret `slack-webhook`(monitoring ns)으로만 저장, Git에는 커밋 안 함. 합성 알림으로 Slack 수신 검증 완료 |
-| ch5 | 5.2 트래픽 관리 | ⬜ | | |
+| ch5 | 5.2 트래픽 관리 | ✅ | 2026-09-14 | Gateway API(`gke-l7-regional-external-managed`) 도입. `k8s/smb/gateway.yaml`(Gateway+HTTPRoute), `k8s/smb/healthcheckpolicy.yaml`(/health:8080) 추가 후 ArgoCD 동기화. proxy-only 서브넷(172.16.0.0/23, asia-northeast3)이 없어 신규 생성. 외부 IP 35.216.78.27로 /health, /id 정상 응답 확인 |
 | ch5 | 5.3 무중단 배포 | ⬜ | | |
 | ch6 | 6.1 캐시 | ⬜ | | |
 | ch6 | 6.2 시크릿 관리 | ⬜ | | |
