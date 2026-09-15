@@ -20,7 +20,7 @@
 | ch4 | 4.3 로그 수집 | ✅ | 2026-09-04 | Loki(SingleBinary) + Fluent Bit(DaemonSet) 설치, Grafana에 Loki 데이터소스 추가. `{namespace="notiflex"}` 쿼리로 notiflex-api 로그 확인 완료 |
 | ch4 | 4.4 알림 | ✅ | 2026-09-05 | PrometheusRule(PodRestartTooMany) + Alertmanager → Slack Webhook 연동. Webhook URL은 Secret `slack-webhook`(monitoring ns)으로만 저장, Git에는 커밋 안 함. 합성 알림으로 Slack 수신 검증 완료 |
 | ch5 | 5.2 트래픽 관리 | ✅ | 2026-09-14 | Gateway API(`gke-l7-regional-external-managed`) 도입. `k8s/smb/gateway.yaml`(Gateway+HTTPRoute), `k8s/smb/healthcheckpolicy.yaml`(/health:8080) 추가 후 ArgoCD 동기화. proxy-only 서브넷(172.16.0.0/23, asia-northeast3)이 없어 신규 생성. 외부 IP 35.216.78.27로 /health, /id 정상 응답 확인 |
-| ch5 | 5.3 무중단 배포 | ⬜ | | |
+| ch5 | 5.3 무중단 배포 | ✅ | 2026-09-15 | Argo Rollouts 설치, deployment.yaml→rollout.yaml(BlueGreen) 전환, notiflex-api-preview 서비스 추가. ci.yaml sed 대상도 rollout.yaml로 변경. 실제 코드 변경 push→CI가 SHA 태그로 빌드→ArgoCD 동기화→Rollout이 preview 배포 후 30초 auto-promote까지 전체 파이프라인 검증 완료(Gateway 외부 IP로 새 버전 응답 확인) |
 | ch6 | 6.1 캐시 | ⬜ | | |
 | ch6 | 6.2 시크릿 관리 | ⬜ | | |
 | ch6 | 6.3 Canary 전환 | ⬜ | | |
@@ -56,6 +56,7 @@
 | ArgoCD | v3.5.2 | 2026-08-31 설치, notiflex-smb Application Synced/Healthy |
 | Loki | chart 7.3.0 (app 3.6.12) | 2026-09-04 설치, SingleBinary 모드, chunksCache/resultsCache 비활성화 |
 | Fluent Bit | chart 2.6.0 (app v2.1.0) | 2026-09-04 설치, DaemonSet 2노드 모두 Running |
+| Argo Rollouts | v1.9.0 (kubectl plugin) | 2026-09-15 설치, Deployment를 BlueGreen 전략의 Rollout으로 전환 |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -85,3 +86,5 @@
 | 4.3 | Grafana에 Loki 데이터소스가 자동으로 추가되지 않음 — 가드레일 문구의 "grafana.datasource.isDefault"는 loki chart에 존재하지 않는 키였음 | 실제로는 kube-prometheus-stack의 `grafana.additionalDataSources`(`helm-values/kube-prometheus.yaml`)에 Loki를 `isDefault: false`로 추가하고 `helm upgrade`로 반영 |
 | 4.4 | 가드레일의 테스트 방법(`kubectl delete pod`)은 실제로 알림을 못 띄운다 — Pod을 지우면 ReplicaSet이 새 Pod을 만들 뿐이고 `kube_pod_container_status_restarts_total`은 새 Pod에서 0부터 시작하므로 "5분 내 재시작 2회 초과" 조건을 충족하지 못함 | Alertmanager API(`/api/v2/alerts`)로 `PodRestartTooMany` 합성 알림을 직접 전송해 Slack 수신 파이프라인만 검증. 실제 재시작 알림을 보려면 앱이 반복적으로 크래시하도록 만들어야 함 |
 | 4.4 | Alertmanager 루트 receiver를 `null`→`slack-notifications`로 바꾸자, GKE가 컨트롤 플레인을 관리해 원래도 항상 거짓 양성으로 떠 있던 `TargetDown`/`KubeControllerManagerDown`/`KubeSchedulerDown`/`KubeProxyDown` 알림까지 한꺼번에 Slack으로 전송됨 (이전엔 `null` receiver라 조용히 무시되고 있었음) | `helm-values/kube-prometheus.yaml`에 `kubeControllerManager.enabled: false`, `kubeScheduler.enabled: false`, `kubeProxy.enabled: false`, `kubeEtcd.enabled: false` 추가 — GKE에서는 표준적으로 비활성화하는 항목들이라 해당 ServiceMonitor/알림 자체가 사라짐 |
+| 5.3 | Argo Rollouts 설치 매니페스트를 `kubectl apply -f`로 적용하면 `rollouts.argoproj.io`/`analysisruns.argoproj.io` CRD의 `metadata.annotations`(last-applied-configuration)가 262144바이트 제한을 초과해 `Invalid` 에러 발생 | `kubectl apply --server-side -f ...`로 재시도 (server-side apply는 last-applied-configuration 어노테이션을 사용하지 않음) |
+| 5.3 | rollout.yaml push 직후 `kubectl argo rollouts get rollout`이 `NotFound` — ArgoCD Application의 `status.sync.revision`이 이전 커밋에 머물러 있어 자동 동기화가 아직 반영 전이었음 | `kubectl annotate application notiflex-smb argocd.argoproj.io/refresh=hard`로 강제 refresh하여 즉시 동기화 (기본 폴링 주기까지 기다리지 않아도 됨) |
