@@ -21,6 +21,7 @@
 | ch4 | 4.4 알림 | ✅ | 2026-09-05 | PrometheusRule(PodRestartTooMany) + Alertmanager → Slack Webhook 연동. Webhook URL은 Secret `slack-webhook`(monitoring ns)으로만 저장, Git에는 커밋 안 함. 합성 알림으로 Slack 수신 검증 완료 |
 | ch5 | 5.2 트래픽 관리 | ✅ | 2026-09-14 | Gateway API(`gke-l7-regional-external-managed`) 도입. `k8s/smb/gateway.yaml`(Gateway+HTTPRoute), `k8s/smb/healthcheckpolicy.yaml`(/health:8080) 추가 후 ArgoCD 동기화. proxy-only 서브넷(172.16.0.0/23, asia-northeast3)이 없어 신규 생성. 외부 IP 35.216.78.27로 /health, /id 정상 응답 확인 |
 | ch5 | 5.3 무중단 배포 | ✅ | 2026-09-15 | Argo Rollouts 설치, deployment.yaml→rollout.yaml(BlueGreen) 전환, notiflex-api-preview 서비스 추가. ci.yaml sed 대상도 rollout.yaml로 변경. 실제 코드 변경 push→CI가 SHA 태그로 빌드→ArgoCD 동기화→Rollout이 preview 배포 후 30초 auto-promote까지 전체 파이프라인 검증 완료(Gateway 외부 IP로 새 버전 응답 확인) |
+| ch5 | 5.4 아키텍처 결정 기록 | ✅ | 2026-09-16 | `docs/architecture-decisions.md` 신설, ADR-001~006을 3~5장 결정 순서(GitOps→CI→CI 인증→모니터링→트래픽 관리→무중단 배포)로 기록 |
 | ch6 | 6.1 캐시 | ⬜ | | |
 | ch6 | 6.2 시크릿 관리 | ⬜ | | |
 | ch6 | 6.3 Canary 전환 | ⬜ | | |
@@ -46,6 +47,8 @@
 | CI 도구 (3.4) | GitHub Actions | (이전 세션 기록 없음, 워크플로우 존재로 완료만 확인) | |
 | 메트릭 모니터링 (4.2) | Prometheus + Grafana (kube-prometheus-stack) | Datadog, CloudWatch, Google Cloud Monitoring | 오픈소스 무료, K8s 사실상 표준, 이후 Loki/Tempo와 Grafana로 통합 |
 | CI GCP 인증 (3.4) | Workload Identity Federation | Service Account JSON 키 | 프로젝트 조직 정책(`constraints/iam.disableServiceAccountKeyCreation`)이 키 발급을 차단, 장기 키 유출 위험도 없는 WIF가 더 안전 |
+| 외부 트래픽 관리 (5.2) | Gateway API | Ingress NGINX, Istio, Traefik | K8s 차세대 표준(GA since 1.27), GKE 네이티브라 Controller 설치 불필요, Gateway/HTTPRoute 역할 분리, Blue/Green·Canary 트래픽 분배와 연동 |
+| 무중단 배포 전략 (5.3) | Argo Rollouts (Blue/Green) | Flagger, K8s native Rolling Update | 같은 Argo 생태계로 ArgoCD와 통합, CRD 기반이라 GitOps 워크플로우와 호환, 6장에서 Canary로 점진 진화 가능 |
 
 ## 현재 버전
 
