@@ -25,7 +25,7 @@ func idHandler(w http.ResponseWriter, r *http.Request) {
 		"id":      id,
 		"pod":     podName,
 		"source":  "ci-argocd-e2e-test",
-		"variant": "bluegreen-verify-v3",
+		"variant": "bluegreen-live-demo-v4",
 	})
 }
 
