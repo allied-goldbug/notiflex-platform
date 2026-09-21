@@ -18,6 +18,14 @@ spec:
           image: asia-northeast3-docker.pkg.dev/project-d64f9b5c-20c8-4906-95b/notiflex/api:sha-b4481ae
           ports:
             - containerPort: 8080
+          env:
+            - name: VALKEY_ADDR
+              value: valkey-primary.notiflex.svc.cluster.local:6379
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: valkey
+                  key: valkey-password
           readinessProbe:
             httpGet:
               path: /health
