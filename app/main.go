@@ -32,7 +32,7 @@ func idHandler(w http.ResponseWriter, r *http.Request) {
 		"id":      id,
 		"pod":     podName,
 		"source":  "ci-argocd-e2e-test",
-		"variant": "bluegreen-live-demo-v4",
+		"variant": "canary-live-demo-v1",
 	})
 }
 
