@@ -26,7 +26,7 @@
 | ch6 | 6.2 시크릿 관리 | ✅ | 2026-09-22 | GKE Secret Manager CSI(`--enable-secret-manager`) 활성화, Valkey 비밀번호를 Secret Manager(`valkey-password`)로 이전. GSA `notiflex-secrets` + KSA `notiflex-api`를 Workload Identity로 바인딩, `SecretProviderClass`(provider: gke)로 `/mnt/secrets/valkey-password` 파일 마운트. 앱은 `VALKEY_PASSWORD_FILE` 우선, `VALKEY_PASSWORD` 폴백. Rollout 전환 중 과도기적으로 NOAUTH 에러(구버전 이미지+신규 CSI 스펙 조합) 발생했으나 CI 신규 이미지 배포 후 자동 해소, 외부 IP로 `/id` 정상 응답(카운터 지속) 확인 |
 | ch6 | 6.3 Canary 전환 | ✅ | 2026-09-22 | rollout.yaml 전략을 blueGreen→canary(steps 20%→50%→80%, 각 30s pause)로 전환, git push 후 `kubectl delete rollout`으로 재생성해 ArgoCD 충돌 없이 적용. 실제 앱 버전 변경(variant canary-live-demo-v1) 배포로 20→50→80→100% 단계별 Pod 전환 및 최종 승격까지 확인, 외부 IP로 신규 variant 응답 검증 완료 |
 | ch7 | 7.2 멀티 노드풀 | ✅ | 2026-09-22 | api-pool(e2-medium)/worker-pool(e2-standard-2)/ops-pool(e2-small) 3개 노드풀 생성(각 1노드, Spot, pd-standard 50GB, GKE_METADATA). rollout.yaml에 `nodeSelector: cloud.google.com/gke-nodepool: api-pool` 추가, git push→ArgoCD 동기화로 Canary(20→50→80→100%) 거쳐 notiflex-api Pod 2개 모두 api-pool로 전환 완료 확인 |
-| ch7 | 7.3 App of Apps | ⬜ | | |
+| ch7 | 7.3 App of Apps | ✅ | 2026-09-22 | `argocd/root-app.yaml`(루트 Application, source path `argocd/apps`, directory.recurse) 생성 후 apply. 기존 `argocd/notiflex-smb.yaml`을 `argocd/apps/notiflex-smb.yaml`로 이동하고 `sync-wave: "2"` 부여(0 인프라/1 플랫폼/2 앱 순서 예약). `kubectl delete application notiflex-smb`로 삭제 후 root-app의 selfHeal이 자동 복구하는 것까지 검증 완료 |
 | ch7 | 7.4 멀티테넌시 | ⬜ | | |
 | ch8 | 8.1 메시징 | ⬜ | | |
 | ch8 | 8.2 트레이싱 | ⬜ | | |
@@ -53,6 +53,7 @@
 | 시크릿 관리 (6.2) | GKE Secret Manager CSI (managed addon) | 오픈소스 Secrets Store CSI Driver 직접 설치 | GKE 관리형 addon이라 컨트롤러/Provider 설치·업그레이드 불필요, `--enable-secret-manager` 한 줄로 활성화, Workload Identity와 자연스럽게 연동 |
 | 배포 전략 (6.3) | Canary | Blue/Green 유지 | 트래픽을 20%→50%→80%로 점진 전환해 신규 버전 문제를 소규모 트래픽에서 먼저 감지 가능, 기존 preview Service(5.3)를 canaryService로 재사용해 인프라 추가 없이 전환 |
 | 워크로드별 노드 배치 (7.2) | nodeSelector (`cloud.google.com/gke-nodepool`) | Taint/Toleration, Node Affinity | GKE가 노드풀 이름을 자동으로 라벨링해줘 별도 태깅 작업 불필요, 문법이 가장 단순해 역할별 노드풀 분리라는 목적에 충분 |
+| 다중 Application 관리 (7.3) | App of Apps | ApplicationSet, 수동 관리 | 관리할 앱이 5~7개 수준으로 템플릿 이점이 크지 않음, "폴더에 YAML 넣으면 앱이 생긴다"는 개념이 가장 직관적이고 순수 YAML만으로 GitOps 원칙 유지 |
 
 ## 현재 버전
 
