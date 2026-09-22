@@ -25,7 +25,7 @@
 | ch6 | 6.1 캐시 | ✅ | 2026-09-21 | Valkey(standalone) 설치, 인메모리 카운터→Valkey INCR 전환. Gateway 외부 IP로 서로 다른 Pod에서 순차 ID(1~6) 공유 확인 |
 | ch6 | 6.2 시크릿 관리 | ✅ | 2026-09-22 | GKE Secret Manager CSI(`--enable-secret-manager`) 활성화, Valkey 비밀번호를 Secret Manager(`valkey-password`)로 이전. GSA `notiflex-secrets` + KSA `notiflex-api`를 Workload Identity로 바인딩, `SecretProviderClass`(provider: gke)로 `/mnt/secrets/valkey-password` 파일 마운트. 앱은 `VALKEY_PASSWORD_FILE` 우선, `VALKEY_PASSWORD` 폴백. Rollout 전환 중 과도기적으로 NOAUTH 에러(구버전 이미지+신규 CSI 스펙 조합) 발생했으나 CI 신규 이미지 배포 후 자동 해소, 외부 IP로 `/id` 정상 응답(카운터 지속) 확인 |
 | ch6 | 6.3 Canary 전환 | ✅ | 2026-09-22 | rollout.yaml 전략을 blueGreen→canary(steps 20%→50%→80%, 각 30s pause)로 전환, git push 후 `kubectl delete rollout`으로 재생성해 ArgoCD 충돌 없이 적용. 실제 앱 버전 변경(variant canary-live-demo-v1) 배포로 20→50→80→100% 단계별 Pod 전환 및 최종 승격까지 확인, 외부 IP로 신규 variant 응답 검증 완료 |
-| ch7 | 7.2 멀티 노드풀 | ⬜ | | |
+| ch7 | 7.2 멀티 노드풀 | ✅ | 2026-09-22 | api-pool(e2-medium)/worker-pool(e2-standard-2)/ops-pool(e2-small) 3개 노드풀 생성(각 1노드, Spot, pd-standard 50GB, GKE_METADATA). rollout.yaml에 `nodeSelector: cloud.google.com/gke-nodepool: api-pool` 추가, git push→ArgoCD 동기화로 Canary(20→50→80→100%) 거쳐 notiflex-api Pod 2개 모두 api-pool로 전환 완료 확인 |
 | ch7 | 7.3 App of Apps | ⬜ | | |
 | ch7 | 7.4 멀티테넌시 | ⬜ | | |
 | ch8 | 8.1 메시징 | ⬜ | | |
@@ -52,6 +52,7 @@
 | 캐시 (6.1) | Valkey | (이전 세션 기록 없음, 가드레일 추천값으로 진행) | ArgoCD와 마찬가지로 Redis 포크 오픈소스, standalone 모드로 리소스 최소화(resourcesPreset=none) 가능, 여러 Pod의 ID 카운터를 INCR로 공유해 split-brain 해결 |
 | 시크릿 관리 (6.2) | GKE Secret Manager CSI (managed addon) | 오픈소스 Secrets Store CSI Driver 직접 설치 | GKE 관리형 addon이라 컨트롤러/Provider 설치·업그레이드 불필요, `--enable-secret-manager` 한 줄로 활성화, Workload Identity와 자연스럽게 연동 |
 | 배포 전략 (6.3) | Canary | Blue/Green 유지 | 트래픽을 20%→50%→80%로 점진 전환해 신규 버전 문제를 소규모 트래픽에서 먼저 감지 가능, 기존 preview Service(5.3)를 canaryService로 재사용해 인프라 추가 없이 전환 |
+| 워크로드별 노드 배치 (7.2) | nodeSelector (`cloud.google.com/gke-nodepool`) | Taint/Toleration, Node Affinity | GKE가 노드풀 이름을 자동으로 라벨링해줘 별도 태깅 작업 불필요, 문법이 가장 단순해 역할별 노드풀 분리라는 목적에 충분 |
 
 ## 현재 버전
 
@@ -72,7 +73,10 @@
 
 | 노드풀 | 머신 타입 | 노드 수 | 주요 워크로드 |
 |--------|----------|---------|-------------|
-| default-pool | e2-medium (Spot) | 2 | notiflex-api (replicas: 2) |
+| default-pool | e2-medium (Spot) | 2 | ArgoCD, Argo Rollouts, monitoring 스택, Valkey, 시스템 DaemonSet |
+| api-pool | e2-medium (Spot) | 1 | notiflex-api (replicas: 2, nodeSelector로 고정) |
+| worker-pool | e2-standard-2 (Spot) | 1 | (미사용, ch8.1 Kafka 예정) |
+| ops-pool | e2-small (Spot) | 1 | (미사용) |
 
 ## 트러블슈팅 이력
 
