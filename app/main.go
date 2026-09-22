@@ -36,13 +36,22 @@ func idHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func valkeyPassword() string {
+	if pwFile := os.Getenv("VALKEY_PASSWORD_FILE"); pwFile != "" {
+		if data, err := os.ReadFile(pwFile); err == nil {
+			return string(data)
+		}
+	}
+	return os.Getenv("VALKEY_PASSWORD")
+}
+
 func newValkeyClient() (valkey.Client, error) {
 	var client valkey.Client
 	var err error
 	for i := 0; i < 10; i++ {
 		client, err = valkey.NewClient(valkey.ClientOption{
 			InitAddress: []string{os.Getenv("VALKEY_ADDR")},
-			Password:    os.Getenv("VALKEY_PASSWORD"),
+			Password:    valkeyPassword(),
 		})
 		if err == nil {
 			return client, nil
