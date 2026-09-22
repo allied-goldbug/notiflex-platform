@@ -23,7 +23,7 @@
 | ch5 | 5.3 무중단 배포 | ✅ | 2026-09-15 | Argo Rollouts 설치, deployment.yaml→rollout.yaml(BlueGreen) 전환, notiflex-api-preview 서비스 추가. ci.yaml sed 대상도 rollout.yaml로 변경. 실제 코드 변경 push→CI가 SHA 태그로 빌드→ArgoCD 동기화→Rollout이 preview 배포 후 30초 auto-promote까지 전체 파이프라인 검증 완료(Gateway 외부 IP로 새 버전 응답 확인) |
 | ch5 | 5.4 아키텍처 결정 기록 | ✅ | 2026-09-16 | `docs/architecture-decisions.md` 신설, ADR-001~006을 3~5장 결정 순서(GitOps→CI→CI 인증→모니터링→트래픽 관리→무중단 배포)로 기록 |
 | ch6 | 6.1 캐시 | ✅ | 2026-09-21 | Valkey(standalone) 설치, 인메모리 카운터→Valkey INCR 전환. Gateway 외부 IP로 서로 다른 Pod에서 순차 ID(1~6) 공유 확인 |
-| ch6 | 6.2 시크릿 관리 | ⬜ | | |
+| ch6 | 6.2 시크릿 관리 | ✅ | 2026-09-22 | GKE Secret Manager CSI(`--enable-secret-manager`) 활성화, Valkey 비밀번호를 Secret Manager(`valkey-password`)로 이전. GSA `notiflex-secrets` + KSA `notiflex-api`를 Workload Identity로 바인딩, `SecretProviderClass`(provider: gke)로 `/mnt/secrets/valkey-password` 파일 마운트. 앱은 `VALKEY_PASSWORD_FILE` 우선, `VALKEY_PASSWORD` 폴백. Rollout 전환 중 과도기적으로 NOAUTH 에러(구버전 이미지+신규 CSI 스펙 조합) 발생했으나 CI 신규 이미지 배포 후 자동 해소, 외부 IP로 `/id` 정상 응답(카운터 지속) 확인 |
 | ch6 | 6.3 Canary 전환 | ⬜ | | |
 | ch7 | 7.2 멀티 노드풀 | ⬜ | | |
 | ch7 | 7.3 App of Apps | ⬜ | | |
@@ -50,18 +50,20 @@
 | 외부 트래픽 관리 (5.2) | Gateway API | Ingress NGINX, Istio, Traefik | K8s 차세대 표준(GA since 1.27), GKE 네이티브라 Controller 설치 불필요, Gateway/HTTPRoute 역할 분리, Blue/Green·Canary 트래픽 분배와 연동 |
 | 무중단 배포 전략 (5.3) | Argo Rollouts (Blue/Green) | Flagger, K8s native Rolling Update | 같은 Argo 생태계로 ArgoCD와 통합, CRD 기반이라 GitOps 워크플로우와 호환, 6장에서 Canary로 점진 진화 가능 |
 | 캐시 (6.1) | Valkey | (이전 세션 기록 없음, 가드레일 추천값으로 진행) | ArgoCD와 마찬가지로 Redis 포크 오픈소스, standalone 모드로 리소스 최소화(resourcesPreset=none) 가능, 여러 Pod의 ID 카운터를 INCR로 공유해 split-brain 해결 |
+| 시크릿 관리 (6.2) | GKE Secret Manager CSI (managed addon) | 오픈소스 Secrets Store CSI Driver 직접 설치 | GKE 관리형 addon이라 컨트롤러/Provider 설치·업그레이드 불필요, `--enable-secret-manager` 한 줄로 활성화, Workload Identity와 자연스럽게 연동 |
 
 ## 현재 버전
 
 | 컴포넌트 | 버전 | 변경 이력 |
 |---------|------|----------|
 | Go | 1.25 | 2026-08-30 최초 설정 (ch6 valkey-go, ch8 OTel SDK 요구사항 대비) |
-| Notiflex 이미지 | sha-12d6f7c | 2026-08-30 v0.1.0 최초 빌드/배포. v0.1.1(/version 엔드포인트) 시도 후 문제로 v0.1.0 롤백. 2026-09-01부터 CI가 git SHA 태그로 자동 관리 (3.5 CI-ArgoCD 연결 이후 시맨틱 버전 태그 대신 SHA 태그 사용). 2026-09-21 Valkey INCR 연동(6.1) 반영 |
+| Notiflex 이미지 | sha-12d6f7c | 2026-08-30 v0.1.0 최초 빌드/배포. v0.1.1(/version 엔드포인트) 시도 후 문제로 v0.1.0 롤백. 2026-09-01부터 CI가 git SHA 태그로 자동 관리 (3.5 CI-ArgoCD 연결 이후 시맨틱 버전 태그 대신 SHA 태그 사용). 2026-09-21 Valkey INCR 연동(6.1) 반영. 2026-09-22 VALKEY_PASSWORD_FILE 지원(6.2 Secret Manager CSI) 반영 |
 | ArgoCD | v3.5.2 | 2026-08-31 설치, notiflex-smb Application Synced/Healthy |
 | Loki | chart 7.3.0 (app 3.6.12) | 2026-09-04 설치, SingleBinary 모드, chunksCache/resultsCache 비활성화 |
 | Fluent Bit | chart 2.6.0 (app v2.1.0) | 2026-09-04 설치, DaemonSet 2노드 모두 Running |
 | Argo Rollouts | v1.9.0 (kubectl plugin) | 2026-09-15 설치, Deployment를 BlueGreen 전략의 Rollout으로 전환 |
 | Valkey | chart 6.3.2 (app 9.1.2) | 2026-09-21 설치, standalone 모드, resourcesPreset=none(requests 50m/64Mi, limits 200m/128Mi) |
+| GKE Secret Manager CSI | GKE managed addon | 2026-09-22 `--enable-secret-manager`로 활성화, `SecretProviderClass`(provider: gke)로 valkey-password를 `/mnt/secrets`에 파일 마운트. GSA `notiflex-secrets` ↔ KSA `notiflex-api` Workload Identity 바인딩 |
 | Kafka | | |
 | OTel SDK | | |
 
@@ -94,3 +96,4 @@
 | 5.3 | Argo Rollouts 설치 매니페스트를 `kubectl apply -f`로 적용하면 `rollouts.argoproj.io`/`analysisruns.argoproj.io` CRD의 `metadata.annotations`(last-applied-configuration)가 262144바이트 제한을 초과해 `Invalid` 에러 발생 | `kubectl apply --server-side -f ...`로 재시도 (server-side apply는 last-applied-configuration 어노테이션을 사용하지 않음) |
 | 5.3 | rollout.yaml push 직후 `kubectl argo rollouts get rollout`이 `NotFound` — ArgoCD Application의 `status.sync.revision`이 이전 커밋에 머물러 있어 자동 동기화가 아직 반영 전이었음 | `kubectl annotate application notiflex-smb argocd.argoproj.io/refresh=hard`로 강제 refresh하여 즉시 동기화 (기본 폴링 주기까지 기다리지 않아도 됨) |
 | 6.1 | `kubectl argo rollouts status`가 `bad CPU type in executable`로 실패 — 로컬(Apple Silicon)에 설치된 kubectl-argo_rollouts 플러그인 바이너리가 x86_64용이라 아키텍처 불일치 | `kubectl get rollout -o jsonpath=...`로 `.status.phase`/`.status.blueGreen.activeSelector`를 폴링하여 대체 확인. 플러그인 재설치가 필요하면 `arm64` 빌드로 교체 |
+| 6.2 | rollout.yaml에 CSI 볼륨/`VALKEY_PASSWORD_FILE`을 먼저 커밋한 직후, 아직 새 이미지가 CI로 빌드되기 전이라 구버전 이미지(파일 읽기 로직 없음)로 뜬 과도기 Pod이 `NOAUTH` 에러로 CrashLoopBackOff에 빠짐 | 앱 코드(`VALKEY_PASSWORD_FILE` 지원)와 매니페스트 변경을 같은 커밋에 넣어 push하면, CI가 새 이미지를 빌드하는 즉시 ArgoCD가 다시 동기화하며 자동 해소됨. 과도기 Pod의 재시작은 무시해도 무방 |
