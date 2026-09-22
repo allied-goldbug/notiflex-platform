@@ -24,7 +24,7 @@
 | ch5 | 5.4 아키텍처 결정 기록 | ✅ | 2026-09-16 | `docs/architecture-decisions.md` 신설, ADR-001~006을 3~5장 결정 순서(GitOps→CI→CI 인증→모니터링→트래픽 관리→무중단 배포)로 기록 |
 | ch6 | 6.1 캐시 | ✅ | 2026-09-21 | Valkey(standalone) 설치, 인메모리 카운터→Valkey INCR 전환. Gateway 외부 IP로 서로 다른 Pod에서 순차 ID(1~6) 공유 확인 |
 | ch6 | 6.2 시크릿 관리 | ✅ | 2026-09-22 | GKE Secret Manager CSI(`--enable-secret-manager`) 활성화, Valkey 비밀번호를 Secret Manager(`valkey-password`)로 이전. GSA `notiflex-secrets` + KSA `notiflex-api`를 Workload Identity로 바인딩, `SecretProviderClass`(provider: gke)로 `/mnt/secrets/valkey-password` 파일 마운트. 앱은 `VALKEY_PASSWORD_FILE` 우선, `VALKEY_PASSWORD` 폴백. Rollout 전환 중 과도기적으로 NOAUTH 에러(구버전 이미지+신규 CSI 스펙 조합) 발생했으나 CI 신규 이미지 배포 후 자동 해소, 외부 IP로 `/id` 정상 응답(카운터 지속) 확인 |
-| ch6 | 6.3 Canary 전환 | ⬜ | | |
+| ch6 | 6.3 Canary 전환 | ✅ | 2026-09-22 | rollout.yaml 전략을 blueGreen→canary(steps 20%→50%→80%, 각 30s pause)로 전환, git push 후 `kubectl delete rollout`으로 재생성해 ArgoCD 충돌 없이 적용. 실제 앱 버전 변경(variant canary-live-demo-v1) 배포로 20→50→80→100% 단계별 Pod 전환 및 최종 승격까지 확인, 외부 IP로 신규 variant 응답 검증 완료 |
 | ch7 | 7.2 멀티 노드풀 | ⬜ | | |
 | ch7 | 7.3 App of Apps | ⬜ | | |
 | ch7 | 7.4 멀티테넌시 | ⬜ | | |
@@ -51,6 +51,7 @@
 | 무중단 배포 전략 (5.3) | Argo Rollouts (Blue/Green) | Flagger, K8s native Rolling Update | 같은 Argo 생태계로 ArgoCD와 통합, CRD 기반이라 GitOps 워크플로우와 호환, 6장에서 Canary로 점진 진화 가능 |
 | 캐시 (6.1) | Valkey | (이전 세션 기록 없음, 가드레일 추천값으로 진행) | ArgoCD와 마찬가지로 Redis 포크 오픈소스, standalone 모드로 리소스 최소화(resourcesPreset=none) 가능, 여러 Pod의 ID 카운터를 INCR로 공유해 split-brain 해결 |
 | 시크릿 관리 (6.2) | GKE Secret Manager CSI (managed addon) | 오픈소스 Secrets Store CSI Driver 직접 설치 | GKE 관리형 addon이라 컨트롤러/Provider 설치·업그레이드 불필요, `--enable-secret-manager` 한 줄로 활성화, Workload Identity와 자연스럽게 연동 |
+| 배포 전략 (6.3) | Canary | Blue/Green 유지 | 트래픽을 20%→50%→80%로 점진 전환해 신규 버전 문제를 소규모 트래픽에서 먼저 감지 가능, 기존 preview Service(5.3)를 canaryService로 재사용해 인프라 추가 없이 전환 |
 
 ## 현재 버전
 
