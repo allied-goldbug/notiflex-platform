@@ -2,8 +2,14 @@ prometheus:
   prometheusSpec:
     resources:
       requests:
-        cpu: 100m
+        cpu: 5m
         memory: 256Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 5m
+      memory: 64Mi
 
 kubeControllerManager:
   enabled: false
@@ -20,7 +26,7 @@ kubeEtcd:
 grafana:
   resources:
     requests:
-      cpu: 50m
+      cpu: 5m
       memory: 128Mi
   additionalDataSources:
     - name: Loki
@@ -33,7 +39,7 @@ alertmanager:
   alertmanagerSpec:
     resources:
       requests:
-        cpu: 25m
+        cpu: 5m
         memory: 64Mi
     secrets:
       - slack-webhook
