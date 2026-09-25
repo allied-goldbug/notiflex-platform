@@ -18,7 +18,7 @@ spec:
         cloud.google.com/gke-nodepool: api-pool
       containers:
         - name: notiflex-api
-          image: asia-northeast3-docker.pkg.dev/project-d64f9b5c-20c8-4906-95b/notiflex/api:sha-63d4da7
+          image: asia-northeast3-docker.pkg.dev/project-d64f9b5c-20c8-4906-95b/notiflex/api:sha-783651b
           ports:
             - containerPort: 8080
           env:
