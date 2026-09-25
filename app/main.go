@@ -117,16 +117,27 @@ func consumeNotifications(broker string) {
 	}
 	defer consumer.Close()
 
-	partitionConsumer, err := consumer.ConsumePartition(notificationsTopic, 0, sarama.OffsetNewest)
+	partitions, err := consumer.Partitions(notificationsTopic)
 	if err != nil {
-		log.Printf("Kafka 파티션 구독 실패: %v", err)
+		log.Printf("Kafka 파티션 목록 조회 실패: %v", err)
 		return
 	}
-	defer partitionConsumer.Close()
 
-	for msg := range partitionConsumer.Messages() {
-		log.Printf("Kafka 메시지 수신: partition=%d offset=%d value=%s", msg.Partition, msg.Offset, string(msg.Value))
+	done := make(chan struct{})
+	for _, partition := range partitions {
+		partitionConsumer, err := consumer.ConsumePartition(notificationsTopic, partition, sarama.OffsetNewest)
+		if err != nil {
+			log.Printf("Kafka 파티션(%d) 구독 실패: %v", partition, err)
+			continue
+		}
+		go func(pc sarama.PartitionConsumer) {
+			defer pc.Close()
+			for msg := range pc.Messages() {
+				log.Printf("Kafka 메시지 수신: partition=%d offset=%d value=%s", msg.Partition, msg.Offset, string(msg.Value))
+			}
+		}(partitionConsumer)
 	}
+	<-done
 }
 
 func main() {
