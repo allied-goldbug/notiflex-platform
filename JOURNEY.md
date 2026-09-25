@@ -28,7 +28,7 @@
 | ch7 | 7.2 멀티 노드풀 | ✅ | 2026-09-22 | api-pool(e2-medium)/worker-pool(e2-standard-2)/ops-pool(e2-small) 3개 노드풀 생성(각 1노드, Spot, pd-standard 50GB, GKE_METADATA). rollout.yaml에 `nodeSelector: cloud.google.com/gke-nodepool: api-pool` 추가, git push→ArgoCD 동기화로 Canary(20→50→80→100%) 거쳐 notiflex-api Pod 2개 모두 api-pool로 전환 완료 확인 |
 | ch7 | 7.3 App of Apps | ✅ | 2026-09-22 | `argocd/root-app.yaml`(루트 Application, source path `argocd/apps`, directory.recurse) 생성 후 apply. 기존 `argocd/notiflex-smb.yaml`을 `argocd/apps/notiflex-smb.yaml`로 이동하고 `sync-wave: "2"` 부여(0 인프라/1 플랫폼/2 앱 순서 예약). `kubectl delete application notiflex-smb`로 삭제 후 root-app의 selfHeal이 자동 복구하는 것까지 검증 완료 |
 | ch7 | 7.4 멀티테넌시 | ✅ | 2026-09-23 | Namespace 분리(`k8s/enterprise/`) + per-tenant Rollout. 가드레일의 `valkey-secret.yaml`(평문) 대신 6.2에서 이미 도입한 GKE Secret Manager CSI 패턴(SecretProviderClass + WI ServiceAccount)을 재사용, GSA `notiflex-secrets`에 enterprise KSA용 Workload Identity 바인딩 추가. VALKEY_ADDR은 cross-namespace DNS(`valkey-primary.notiflex.svc.cluster.local`)로 공유 Valkey 연결. root-app이 `argocd/apps/notiflex-enterprise.yaml`을 자동 감지해 notiflex-enterprise Application 생성 확인 |
-| ch8 | 8.1 메시징 | ⬜ | | |
+| ch8 | 8.1 메시징 | ✅ | 2026-09-25 | Strimzi(0.51.0)+Kafka(4.1.0, KRaft, dual-role KafkaNodePool) worker-pool에 배치, notifications 토픽(3 partitions) 생성. notiflex-api를 Producer/Consumer로 전환, KAFKA_BROKER 환경변수 주입. CI 빌드→ArgoCD Canary 배포→`/id` 요청 시 Kafka 메시지 전송·전 파티션 Consumer 수신까지 엔드투엔드 검증 완료 |
 | ch8 | 8.2 트레이싱 | ⬜ | | |
 | ch8 | 8.3 CronJob | ⬜ | | |
 | ch9 | 9.1 저장소 분석 | ⬜ | | |
@@ -55,6 +55,7 @@
 | 워크로드별 노드 배치 (7.2) | nodeSelector (`cloud.google.com/gke-nodepool`) | Taint/Toleration, Node Affinity | GKE가 노드풀 이름을 자동으로 라벨링해줘 별도 태깅 작업 불필요, 문법이 가장 단순해 역할별 노드풀 분리라는 목적에 충분 |
 | 다중 Application 관리 (7.3) | App of Apps | ApplicationSet, 수동 관리 | 관리할 앱이 5~7개 수준으로 템플릿 이점이 크지 않음, "폴더에 YAML 넣으면 앱이 생긴다"는 개념이 가장 직관적이고 순수 YAML만으로 GitOps 원칙 유지 |
 | 멀티테넌시 (7.4) | Namespace 분리 + per-tenant Rollout | 단일 namespace + 라벨 격리, vCluster | 강한 격리, ArgoCD App of Apps와 자연 결합, 테넌트별 독립 배포 |
+| 이벤트 기반 메시징 (8.1) | Kafka (Strimzi Operator) | RabbitMQ, NATS, Redis Streams | 이벤트 드리븐 아키텍처의 업계 표준, Strimzi가 CRD로 GitOps 호환, KRaft 모드로 ZooKeeper 없이 운영 가능, worker-pool(e2-standard-2)에 배치해 학습 목적의 리소스 부담 최소화 |
 
 ## 현재 버전
 
@@ -68,7 +69,9 @@
 | Argo Rollouts | v1.9.0 (kubectl plugin) | 2026-09-15 설치, Deployment를 BlueGreen 전략의 Rollout으로 전환 |
 | Valkey | chart 6.3.2 (app 9.1.2) | 2026-09-21 설치, standalone 모드, resourcesPreset=none(requests 50m/64Mi, limits 200m/128Mi) |
 | GKE Secret Manager CSI | GKE managed addon | 2026-09-22 `--enable-secret-manager`로 활성화, `SecretProviderClass`(provider: gke)로 valkey-password를 `/mnt/secrets`에 파일 마운트. GSA `notiflex-secrets` ↔ KSA `notiflex-api` Workload Identity 바인딩 |
-| Kafka | | |
+| Strimzi Operator | 0.51.0 | 2026-09-25 helm 설치, worker-pool에 배치 |
+| Kafka | 4.1.0 (KRaft, metadataVersion 4.1-IV1) | 2026-09-25 Strimzi v1 API(KafkaNodePool dual-role: controller+broker) 설치, notifications 토픽(3 partitions) 생성 |
+| IBM/sarama | v1.47.0 | 2026-09-25 notiflex-api에 Producer/Consumer 코드 추가 |
 | OTel SDK | | |
 
 ## 현재 리소스
@@ -77,7 +80,7 @@
 |--------|----------|---------|-------------|
 | default-pool | e2-medium (Spot) | 2 | ArgoCD, Argo Rollouts, monitoring 스택, Valkey, 시스템 DaemonSet |
 | api-pool | e2-medium (Spot) | 1 | notiflex-api (replicas: 2, nodeSelector로 고정), notiflex-enterprise/notiflex-api (replicas: 2, nodeSelector로 고정) |
-| worker-pool | e2-standard-2 (Spot) | 1 | (미사용, ch8.1 Kafka 예정) |
+| worker-pool | e2-standard-2 (Spot) | 1 | Strimzi Operator, Kafka(dual-role KafkaNodePool), entity-operator |
 | ops-pool | e2-small (Spot) | 1 | (미사용) |
 
 ## 트러블슈팅 이력
@@ -104,3 +107,5 @@
 | 5.3 | rollout.yaml push 직후 `kubectl argo rollouts get rollout`이 `NotFound` — ArgoCD Application의 `status.sync.revision`이 이전 커밋에 머물러 있어 자동 동기화가 아직 반영 전이었음 | `kubectl annotate application notiflex-smb argocd.argoproj.io/refresh=hard`로 강제 refresh하여 즉시 동기화 (기본 폴링 주기까지 기다리지 않아도 됨) |
 | 6.1 | `kubectl argo rollouts status`가 `bad CPU type in executable`로 실패 — 로컬(Apple Silicon)에 설치된 kubectl-argo_rollouts 플러그인 바이너리가 x86_64용이라 아키텍처 불일치 | `kubectl get rollout -o jsonpath=...`로 `.status.phase`/`.status.blueGreen.activeSelector`를 폴링하여 대체 확인. 플러그인 재설치가 필요하면 `arm64` 빌드로 교체 |
 | 6.2 | rollout.yaml에 CSI 볼륨/`VALKEY_PASSWORD_FILE`을 먼저 커밋한 직후, 아직 새 이미지가 CI로 빌드되기 전이라 구버전 이미지(파일 읽기 로직 없음)로 뜬 과도기 Pod이 `NOAUTH` 에러로 CrashLoopBackOff에 빠짐 | 앱 코드(`VALKEY_PASSWORD_FILE` 지원)와 매니페스트 변경을 같은 커밋에 넣어 push하면, CI가 새 이미지를 빌드하는 즉시 ArgoCD가 다시 동기화하며 자동 해소됨. 과도기 Pod의 재시작은 무시해도 무방 |
+| 8.1 | Strimzi v1 API(`KafkaNodePool`, `Kafka`)의 `template.pod`에는 `nodeSelector` 필드가 없다 — 가드레일 예시의 `nodeSelector.role=worker`처럼 단순 필드로 노드를 지정할 수 없어 `unknown field` 에러 발생 | `template.pod.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution`으로 `cloud.google.com/gke-nodepool: worker-pool`을 지정. 참고로 실제 worker-pool 노드에는 `role=worker` 라벨도, taint도 없어(7.2에서 `cloud.google.com/gke-nodepool` 라벨만 사용) helm install 시에도 toleration 없이 nodeSelector만으로 스케줄 성공 |
+| 8.1 | notifications 토픽이 3 partitions인데 Consumer가 `ConsumePartition(topic, 0, ...)`로 파티션 0만 구독 — Producer의 기본 랜덤 파티셔너가 메시지를 파티션 1/2로 보내면 Consumer가 영원히 수신하지 못해 "메시지가 유실된 것처럼" 보임 | `consumer.Partitions(topic)`으로 전체 파티션 목록을 조회해 파티션마다 goroutine을 띄워 구독하도록 수정. 로컬에 go 툴체인이 없어 `docker run -v ... golang:1.25-alpine`으로 `go get`/`go mod tidy`/빌드 검증 수행 |
