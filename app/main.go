@@ -8,10 +8,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/IBM/sarama"
 	"github.com/valkey-io/valkey-go"
 )
 
-var valkeyClient valkey.Client
+const notificationsTopic = "notifications"
+
+var (
+	valkeyClient  valkey.Client
+	kafkaProducer sarama.SyncProducer
+)
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -26,6 +32,13 @@ func idHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	podName := os.Getenv("HOSTNAME")
+
+	if _, _, err := kafkaProducer.SendMessage(&sarama.ProducerMessage{
+		Topic: notificationsTopic,
+		Value: sarama.StringEncoder(fmt.Sprintf(`{"id":%d,"pod":%q}`, id, podName)),
+	}); err != nil {
+		log.Printf("Kafka 메시지 전송 실패: %v", err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -62,6 +75,60 @@ func newValkeyClient() (valkey.Client, error) {
 	return nil, err
 }
 
+func newKafkaConfig() *sarama.Config {
+	cfg := sarama.NewConfig()
+	cfg.Version = sarama.V4_1_0_0
+	return cfg
+}
+
+func newKafkaProducer(broker string) (sarama.SyncProducer, error) {
+	cfg := newKafkaConfig()
+	cfg.Producer.Return.Successes = true
+
+	var producer sarama.SyncProducer
+	var err error
+	for i := 0; i < 10; i++ {
+		producer, err = sarama.NewSyncProducer([]string{broker}, cfg)
+		if err == nil {
+			return producer, nil
+		}
+		log.Printf("Kafka Producer 연결 재시도 %d/10: %v", i+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	return nil, err
+}
+
+func consumeNotifications(broker string) {
+	cfg := newKafkaConfig()
+
+	var consumer sarama.Consumer
+	var err error
+	for i := 0; i < 10; i++ {
+		consumer, err = sarama.NewConsumer([]string{broker}, cfg)
+		if err == nil {
+			break
+		}
+		log.Printf("Kafka Consumer 연결 재시도 %d/10: %v", i+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	if err != nil {
+		log.Printf("Kafka Consumer 생성 실패: %v", err)
+		return
+	}
+	defer consumer.Close()
+
+	partitionConsumer, err := consumer.ConsumePartition(notificationsTopic, 0, sarama.OffsetNewest)
+	if err != nil {
+		log.Printf("Kafka 파티션 구독 실패: %v", err)
+		return
+	}
+	defer partitionConsumer.Close()
+
+	for msg := range partitionConsumer.Messages() {
+		log.Printf("Kafka 메시지 수신: partition=%d offset=%d value=%s", msg.Partition, msg.Offset, string(msg.Value))
+	}
+}
+
 func main() {
 	client, err := newValkeyClient()
 	if err != nil {
@@ -69,6 +136,16 @@ func main() {
 	}
 	valkeyClient = client
 	defer valkeyClient.Close()
+
+	kafkaBroker := os.Getenv("KAFKA_BROKER")
+	producer, err := newKafkaProducer(kafkaBroker)
+	if err != nil {
+		log.Fatalf("Kafka Producer 연결 실패: %v", err)
+	}
+	kafkaProducer = producer
+	defer kafkaProducer.Close()
+
+	go consumeNotifications(kafkaBroker)
 
 	http.HandleFunc("/health", healthHandler)
 	http.HandleFunc("/id", idHandler)
