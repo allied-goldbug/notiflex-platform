@@ -34,6 +34,11 @@ grafana:
       url: http://loki.monitoring.svc.cluster.local:3100
       access: proxy
       isDefault: false
+    - name: Tempo
+      type: tempo
+      url: http://tempo.monitoring.svc.cluster.local:3200
+      access: proxy
+      isDefault: false
 
 alertmanager:
   alertmanagerSpec:
