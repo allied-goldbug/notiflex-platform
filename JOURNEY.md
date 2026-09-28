@@ -30,7 +30,7 @@
 | ch7 | 7.4 멀티테넌시 | ✅ | 2026-09-23 | Namespace 분리(`k8s/enterprise/`) + per-tenant Rollout. 가드레일의 `valkey-secret.yaml`(평문) 대신 6.2에서 이미 도입한 GKE Secret Manager CSI 패턴(SecretProviderClass + WI ServiceAccount)을 재사용, GSA `notiflex-secrets`에 enterprise KSA용 Workload Identity 바인딩 추가. VALKEY_ADDR은 cross-namespace DNS(`valkey-primary.notiflex.svc.cluster.local`)로 공유 Valkey 연결. root-app이 `argocd/apps/notiflex-enterprise.yaml`을 자동 감지해 notiflex-enterprise Application 생성 확인 |
 | ch8 | 8.1 메시징 | ✅ | 2026-09-25 | Strimzi(0.51.0)+Kafka(4.1.0, KRaft, dual-role KafkaNodePool) worker-pool에 배치, notifications 토픽(3 partitions) 생성. notiflex-api를 Producer/Consumer로 전환, KAFKA_BROKER 환경변수 주입. CI 빌드→ArgoCD Canary 배포→`/id` 요청 시 Kafka 메시지 전송·전 파티션 Consumer 수신까지 엔드투엔드 검증 완료 |
 | ch8 | 8.2 트레이싱 | ✅ | 2026-09-27 | Grafana Tempo(chart 1.24.4, monolithic) ops-pool에 설치. notiflex-api에 OTel SDK(TracerProvider, OTLP gRPC exporter) 추가, `/health`·`/id` 핸들러에 span, Valkey INCR/Kafka 발행을 하위 span(`valkey.incr`, `kafka.produce`)으로 분리. Rollout에 `OTEL_EXPORTER_OTLP_ENDPOINT` 추가, git push→CI 빌드(sha-af19a8e)→ArgoCD Canary 배포 완료. Grafana에 Tempo 데이터소스(isDefault: false) 추가 후 `/id` 요청 3회 → Grafana 데이터소스 프록시로 idHandler 트레이스(하위 span 포함) 조회까지 엔드투엔드 검증 완료 |
-| ch8 | 8.3 CronJob | ⬜ | | |
+| ch8 | 8.3 CronJob | ✅ | 2026-09-28 | `k8s/smb/healthcheck-cronjob.yaml` 생성(스케줄 `*/5 * * * *`, ops-pool 배치, curlimages/curl로 `/health` 호출). kubectl apply로 즉시 적용 후 CronJob 생성 확인, ArgoCD가 매니페스트 추가 인식하도록 git push |
 | ch9 | 9.1 저장소 분석 | ⬜ | | |
 | ch9 | 9.2 회고 | ⬜ | | |
 | ch9 | 9.3 온보딩 문서 | ⬜ | | |
@@ -57,6 +57,7 @@
 | 멀티테넌시 (7.4) | Namespace 분리 + per-tenant Rollout | 단일 namespace + 라벨 격리, vCluster | 강한 격리, ArgoCD App of Apps와 자연 결합, 테넌트별 독립 배포 |
 | 이벤트 기반 메시징 (8.1) | Kafka (Strimzi Operator) | RabbitMQ, NATS, Redis Streams | 이벤트 드리븐 아키텍처의 업계 표준, Strimzi가 CRD로 GitOps 호환, KRaft 모드로 ZooKeeper 없이 운영 가능, worker-pool(e2-standard-2)에 배치해 학습 목적의 리소스 부담 최소화 |
 | 분산 트레이싱 (8.2) | Grafana Tempo | Jaeger, Zipkin | 4장에서 이미 운영 중인 Grafana에서 바로 트레이스 조회 가능해 별도 UI 불필요, Prometheus(메트릭)+Loki(로그)+Tempo(트레이스)를 Grafana 하나로 통합, 단일 바이너리 모드로 ops-pool에 경량 배치 |
+| 배치 자동화 (ch8.3) | K8s CronJob | 외부 cron + 쿠버네티스 외부 트리거, Argo Workflows | 쿠버네티스 네이티브, ops-pool 배치, ArgoCD가 매니페스트로 관리 |
 
 ## 현재 버전
 
