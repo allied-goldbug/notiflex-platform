@@ -11,14 +11,15 @@ spec:
     - name: service-name
   metrics:
     - name: error-rate
-      interval: 10s
+      interval: 15s
       count: 3
       failureLimit: 0
+      consecutiveErrorLimit: 8
       successCondition: result[0] <= 0.05
       provider:
         prometheus:
           address: http://kube-prometheus-kube-prome-prometheus.monitoring.svc.cluster.local:9090
           query: |
-            sum(rate(http_requests_total{job="{{args.service-name}}", status=~"5.."}[1m]))
+            (sum(increase(http_requests_total{job="{{args.service-name}}", status=~"5.."}[2m])) or vector(0))
             /
-            (sum(rate(http_requests_total{job="{{args.service-name}}"}[1m])) or vector(1))
+            (sum(increase(http_requests_total{job="{{args.service-name}}"}[2m])) or vector(1))

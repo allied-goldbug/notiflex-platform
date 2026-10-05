@@ -59,7 +59,7 @@ spec:
       stableService: notiflex-api
       steps:
         - setWeight: 20
-        - pause: {duration: 30s}
+        - pause: {duration: 45s}
         - analysis:
             templates:
               - templateName: notiflex-error-rate
@@ -67,7 +67,7 @@ spec:
               - name: service-name
                 value: notiflex-api-preview
         - setWeight: 50
-        - pause: {duration: 30s}
+        - pause: {duration: 45s}
         - analysis:
             templates:
               - templateName: notiflex-error-rate
@@ -75,7 +75,7 @@ spec:
               - name: service-name
                 value: notiflex-api-preview
         - setWeight: 80
-        - pause: {duration: 30s}
+        - pause: {duration: 45s}
         - analysis:
             templates:
               - templateName: notiflex-error-rate
