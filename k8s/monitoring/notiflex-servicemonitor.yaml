@@ -1,0 +1,47 @@
+# stable(notiflex-api)과 canary(notiflex-api-preview) 트래픽을 분리해서 스크레이프한다.
+# Argo Rollouts가 canary 진행 중 notiflex-api-preview Service의 엔드포인트를
+# canary Pod로만 동적으로 바꿔주므로, job="notiflex-api-preview" 레이블만으로
+# canary 전용 에러율을 분리해 볼 수 있다.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notiflex-api-stable
+  namespace: monitoring
+  labels:
+    release: kube-prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - notiflex
+  selector:
+    matchLabels:
+      canary-role: stable
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: job
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: notiflex-api-canary
+  namespace: monitoring
+  labels:
+    release: kube-prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - notiflex
+  selector:
+    matchLabels:
+      canary-role: canary
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 10s
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: job

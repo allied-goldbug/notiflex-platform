@@ -7,9 +7,13 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/IBM/sarama"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/valkey-io/valkey-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -27,7 +31,32 @@ var (
 	valkeyClient  valkey.Client
 	kafkaProducer sarama.SyncProducer
 	tracer        = otel.Tracer("notiflex-api")
+
+	httpRequestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "핸들러별 HTTP 응답 상태 코드 누적 카운트",
+	}, []string{"path", "status"})
 )
+
+// statusRecorder는 핸들러가 WriteHeader로 응답한 실제 상태 코드를 가로채
+// http_requests_total 메트릭에 반영하기 위한 http.ResponseWriter 래퍼다.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+func instrument(path string, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next(rec, r)
+		httpRequestsTotal.WithLabelValues(path, strconv.Itoa(rec.status)).Inc()
+	}
+}
 
 // initTracer는 OTEL_EXPORTER_OTLP_ENDPOINT가 설정된 경우 Tempo로 트레이스를 전송하는
 // TracerProvider를 초기화한다. 엔드포인트가 없으면 트레이싱 없이 nil을 반환한다.
@@ -251,8 +280,9 @@ func main() {
 
 	go consumeNotifications(kafkaBroker)
 
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/id", idHandler)
+	http.HandleFunc("/health", instrument("/health", healthHandler))
+	http.HandleFunc("/id", instrument("/id", idHandler))
+	http.Handle("/metrics", promhttp.Handler())
 
 	port := "8080"
 	fmt.Printf("notiflex-api listening on port %s\n", port)

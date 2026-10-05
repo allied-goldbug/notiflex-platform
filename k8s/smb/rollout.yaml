@@ -60,7 +60,25 @@ spec:
       steps:
         - setWeight: 20
         - pause: {duration: 30s}
+        - analysis:
+            templates:
+              - templateName: notiflex-error-rate
+            args:
+              - name: service-name
+                value: notiflex-api-preview
         - setWeight: 50
         - pause: {duration: 30s}
+        - analysis:
+            templates:
+              - templateName: notiflex-error-rate
+            args:
+              - name: service-name
+                value: notiflex-api-preview
         - setWeight: 80
         - pause: {duration: 30s}
+        - analysis:
+            templates:
+              - templateName: notiflex-error-rate
+            args:
+              - name: service-name
+                value: notiflex-api-preview
